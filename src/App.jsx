@@ -1,13 +1,6 @@
 import { useState } from 'react'
 import PinScreen from './components/PinScreen'
-
-function AppContent() {
-  return (
-    <div className="p-6 text-[var(--text-h)]">
-      <h1 className="text-2xl font-semibold">App Content</h1>
-    </div>
-  )
-}
+import AppContent from './components/AppContent'
 
 function App() {
   const [unlocked, setUnlocked] = useState(false)
@@ -16,7 +9,7 @@ function App() {
     return <PinScreen onUnlock={() => setUnlocked(true)} />
   }
 
-  return <AppContent />
+  return <AppContent onLock={() => setUnlocked(false)} />
 }
 
 export default App

@@ -15,6 +15,16 @@ function timeAgo(iso) {
 function wordCount(t) { return t.trim() ? t.trim().split(/\s+/).length : 0; }
 function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+function fallbackCopy(text, onDone) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try { if (document.execCommand('copy')) onDone(); } catch (e) { void e; }
+  document.body.removeChild(ta);
+}
+
 async function compressImage(dataUrl, maxPx = 900, q = 0.75) {
   return new Promise((res) => {
     const img = new Image();
@@ -201,15 +211,33 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
 /* ── Note Reader ──────────────────────────────────────────── */
 function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit }) {
   const [search, setSearch] = useState(outerSearch || '');
+  const [copied, setCopied] = useState(false);
   const rawText = note.content.replace(/\[image:[a-z0-9]+\]/gi, '');
   const imgCount = (note.images || []).length;
   const matchCount = search.trim()
     ? ((note.title + '\n' + rawText).match(new RegExp(escRe(search), 'gi')) || []).length
     : 0;
 
+  const handleCopy = () => {
+    const text = [note.title, rawText].filter(Boolean).join('\n\n');
+    const finish = () => { setCopied(true); setTimeout(() => setCopied(false), 2000); };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(finish).catch(() => fallbackCopy(text, finish));
+    } else {
+      fallbackCopy(text, finish);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
-      <ViewHeader library={library} room={room} right={null}
+      <ViewHeader library={library} room={room}
+        right={
+          <button onClick={handleCopy} title="Copy note"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-xs text-[var(--text-h)] hover:opacity-70 transition-all active:scale-95 flex-shrink-0">
+            {copied ? '✅' : '📋'}
+            <span>{copied ? 'Copied!' : 'Copy'}</span>
+          </button>
+        }
         extra={
           <div className="px-4 pb-2.5">
             <div className="relative">

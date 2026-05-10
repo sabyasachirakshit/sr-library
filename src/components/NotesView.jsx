@@ -203,6 +203,9 @@ function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit }
   const [search, setSearch] = useState(outerSearch || '');
   const rawText = note.content.replace(/\[image:[a-z0-9]+\]/gi, '');
   const imgCount = (note.images || []).length;
+  const matchCount = search.trim()
+    ? ((note.title + '\n' + rawText).match(new RegExp(escRe(search), 'gi')) || []).length
+    : 0;
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
@@ -218,6 +221,11 @@ function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit }
                 <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--text)] opacity-40 hover:opacity-70">✕</button>
               )}
             </div>
+            {search.trim() && (
+              <p className="text-xs mt-1.5 px-1" style={{ color: matchCount > 0 ? 'var(--accent)' : 'var(--text)', opacity: matchCount > 0 ? 0.7 : 0.4 }}>
+                {matchCount > 0 ? `${matchCount} match${matchCount > 1 ? 'es' : ''} found` : 'No matches'}
+              </p>
+            )}
           </div>
         } />
 
@@ -312,13 +320,20 @@ export default function NotesView({ room, library, onBack }) {
         ) : (
           <>
             {/* Search */}
-            <div className="relative mb-4">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-40">🔍</span>
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search notes…"
-                className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-sm text-[var(--text-h)] placeholder:text-[var(--text)] placeholder:opacity-40 outline-none focus:border-[var(--accent)] transition-colors" />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text)] opacity-40 hover:opacity-70">✕</button>
+            <div className="mb-4">
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-40">🔍</span>
+                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search notes…"
+                  className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-sm text-[var(--text-h)] placeholder:text-[var(--text)] placeholder:opacity-40 outline-none focus:border-[var(--accent)] transition-colors" />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text)] opacity-40 hover:opacity-70">✕</button>
+                )}
+              </div>
+              {search.trim() && (
+                <p className="text-xs mt-1.5 px-1" style={{ color: filtered.length > 0 ? 'var(--accent)' : 'var(--text)', opacity: filtered.length > 0 ? 0.7 : 0.4 }}>
+                  {filtered.length > 0 ? `${filtered.length} note${filtered.length > 1 ? 's' : ''} found` : 'No notes found'}
+                </p>
               )}
             </div>
 

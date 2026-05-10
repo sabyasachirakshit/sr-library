@@ -18,6 +18,20 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+async function compressImage(dataUrl, maxPx = 900, q = 0.75) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+      const c = document.createElement('canvas');
+      c.width = img.width * ratio; c.height = img.height * ratio;
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      res(c.toDataURL('image/jpeg', q));
+    };
+    img.src = dataUrl;
+  });
+}
+
 function RenameModal({ current, onClose, onRename }) {
   const [name, setName] = useState(current);
   return (
@@ -61,9 +75,11 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename }) 
       {/* Coloured header */}
       <div
         className="h-24 flex items-center justify-center relative rounded-t-2xl overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${lib.accent}38, ${lib.accent}18)` }}
+        style={lib.coverImage ? {} : { background: `linear-gradient(135deg, ${lib.accent}38, ${lib.accent}18)` }}
       >
-        <span className="text-4xl z-10">{lib.icon}</span>
+        {lib.coverImage
+          ? <img src={lib.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          : <span className="text-4xl z-10">{lib.icon}</span>}
 
         {/* Options button */}
         <button
@@ -134,10 +150,25 @@ function CreateLibraryModal({ onClose, onCreate }) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState(ICONS[0]);
   const [color, setColor] = useState(ACCENT_COLORS[0]);
+  const [coverImage, setCoverImage] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const imgRef = useRef(null);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    setUploading(true);
+    const fr = new FileReader();
+    fr.onload = async (ev) => {
+      setCoverImage(await compressImage(ev.target.result));
+      setUploading(false);
+    };
+    fr.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleCreate = () => {
     if (!name.trim()) return;
-    onCreate({ name: name.trim(), icon, accent: color });
+    onCreate({ name: name.trim(), icon, accent: color, coverImage: coverImage || null });
   };
 
   return (
@@ -163,10 +194,34 @@ function CreateLibraryModal({ onClose, onCreate }) {
 
           {/* Preview */}
           <div
-            className="w-full h-20 rounded-2xl mb-6 flex items-center justify-center text-3xl"
-            style={{ background: `linear-gradient(135deg, ${color}40, ${color}20)` }}
+            className="w-full h-20 rounded-2xl mb-6 flex items-center justify-center text-3xl overflow-hidden relative"
+            style={coverImage ? {} : { background: `linear-gradient(135deg, ${color}40, ${color}20)` }}
           >
-            {icon}
+            {coverImage
+              ? <img src={coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              : icon}
+          </div>
+
+          {/* Cover Image */}
+          <div className="mb-5">
+            <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2 block">
+              Cover Image <span className="normal-case font-normal opacity-40">(optional)</span>
+            </label>
+            {coverImage ? (
+              <div className="relative w-full h-20 rounded-xl overflow-hidden">
+                <img src={coverImage} alt="" className="w-full h-full object-cover" />
+                <button onClick={() => setCoverImage(null)}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors">
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => imgRef.current.click()} disabled={uploading}
+                className="w-full py-3 rounded-xl bg-[var(--code-bg)] border border-dashed border-[var(--border)] text-sm text-[var(--text)] opacity-60 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 disabled:opacity-30">
+                {uploading ? '⏳ Compressing…' : '🖼 Upload cover image'}
+              </button>
+            )}
+            <input ref={imgRef} type="file" accept="image/*" hidden onChange={handleImageUpload} />
           </div>
 
           {/* Name */}
@@ -279,12 +334,13 @@ export default function AppContent({ onLock }) {
     updateStore({ libraries: libs });
   };
 
-  const handleCreate = ({ name, icon, accent }) => {
+  const handleCreate = ({ name, icon, accent, coverImage }) => {
     const newLib = {
       id: genId(),
       name,
       icon,
       accent,
+      coverImage: coverImage || null,
       createdAt: new Date().toISOString(),
     };
     persistLibraries([...libraries, newLib]);

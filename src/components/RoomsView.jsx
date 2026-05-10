@@ -16,7 +16,7 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-function RoomCard({ room, noteCount, onOpen, onDelete }) {
+function RoomCard({ room, noteCount, onOpen, onDelete, onRename }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -56,12 +56,16 @@ function RoomCard({ room, noteCount, onOpen, onDelete }) {
             onClick={(e) => e.stopPropagation()}
           >
             {!confirmDelete ? (
-              <button
-                onClick={handleDeleteClick}
-                className="w-full px-4 py-3 text-sm text-red-500 text-left hover:bg-red-500/10 transition-colors"
-              >
-                🗑 Delete room
-              </button>
+              <>
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(room); }}
+                  className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
+                  ✏️ Rename
+                </button>
+                <button onClick={handleDeleteClick}
+                  className="w-full px-4 py-3 text-sm text-red-500 text-left hover:bg-red-500/10 transition-colors">
+                  🗑 Delete room
+                </button>
+              </>
             ) : (
               <div className="p-3 flex flex-col gap-2">
                 <p className="text-xs text-[var(--text)] text-center leading-snug">
@@ -199,11 +203,28 @@ function CreateRoomModal({ library, onClose, onCreate }) {
   );
 }
 
+function RenameModal({ current, label, onClose, onRename }) {
+  const [name, setName] = useState(current);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm modal-fade-in" />
+      <div className="relative w-full sm:max-w-sm bg-[var(--bg)] rounded-t-3xl sm:rounded-3xl z-10 modal-slide-up px-6 pt-5 pb-8" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-center mb-5 sm:hidden"><div className="w-10 h-1 bg-[var(--border)] rounded-full" /></div>
+        <h2 className="text-lg font-bold text-[var(--text-h)] mb-4">Rename {label}</h2>
+        <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && onRename(name.trim())}
+          maxLength={32} className="w-full px-4 py-3 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-[var(--accent)] transition-colors text-sm mb-4" />
+        <button onClick={() => name.trim() && onRename(name.trim())} disabled={!name.trim()} className="w-full py-3 rounded-2xl bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-30">Save</button>
+      </div>
+    </div>
+  );
+}
+
 export default function RoomsView({ library, onBack, onOpenRoom }) {
   const [rooms, setRooms] = useState(() =>
     (getStore().rooms || []).filter((r) => r.libraryId === library.id)
   );
   const [showCreate, setShowCreate] = useState(false);
+  const [renamingRoom, setRenamingRoom] = useState(null);
 
   const persistRooms = (updated) => {
     setRooms(updated);
@@ -223,27 +244,24 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
     updateStore({ notes: notes.filter((n) => n.roomId !== id) });
   };
 
+  const handleRename = (id, name) => {
+    persistRooms(rooms.map((r) => r.id === id ? { ...r, name } : r));
+    setRenamingRoom(null);
+  };
+
   const noteCount = (roomId) =>
     (getStore().notes || []).filter((n) => n.roomId === roomId).length;
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-[var(--text-h)] hover:opacity-70 transition-opacity text-base"
-        >
-          ←
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-base font-bold text-[var(--text-h)] leading-tight flex items-center gap-1.5 truncate">
-            <span>{library.icon}</span> {library.name}
-          </h1>
-          <p className="text-xs text-[var(--text)] opacity-50">
-            {rooms.length} {rooms.length === 1 ? 'room' : 'rooms'}
-          </p>
-        </div>
+      {/* Header — title only, back is in FAB stack */}
+      <header className="sticky top-0 z-10 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 py-3">
+        <h1 className="text-base font-bold text-[var(--text-h)] leading-tight flex items-center gap-1.5 truncate">
+          <span>{library.icon}</span> {library.name}
+        </h1>
+        <p className="text-xs text-[var(--text)] opacity-50">
+          {rooms.length} {rooms.length === 1 ? 'room' : 'rooms'}
+        </p>
       </header>
 
       {/* Breadcrumb strip */}
@@ -282,28 +300,29 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
                 noteCount={noteCount(room.id)}
                 onOpen={() => onOpenRoom(room)}
                 onDelete={handleDelete}
+                onRename={setRenamingRoom}
               />
             ))}
           </div>
         )}
       </main>
 
-      {rooms.length > 0 && (
-        <button
-          onClick={() => setShowCreate(true)}
-          className="fixed bottom-6 right-5 w-14 h-14 rounded-full text-white shadow-xl text-2xl flex items-center justify-center active:scale-90 transition-transform hover:opacity-90 z-10"
-          style={{ backgroundColor: library.accent }}
-        >
-          +
+      {/* FAB stack: ← above + */}
+      <div className="fixed bottom-6 right-5 flex flex-col items-center gap-3 z-20">
+        <button onClick={() => setShowCreate(true)}
+          className="w-14 h-14 rounded-full text-white shadow-xl text-2xl flex items-center justify-center active:scale-90 transition-transform"
+          style={{ backgroundColor: library.accent }}>+</button>
+        <button onClick={onBack}
+          className="w-12 h-12 rounded-full bg-[var(--code-bg)] border border-[var(--border)] shadow-md text-[var(--text-h)] text-base flex items-center justify-center active:scale-90 transition-transform hover:opacity-70">
+          ←
         </button>
-      )}
+      </div>
 
       {showCreate && (
-        <CreateRoomModal
-          library={library}
-          onClose={() => setShowCreate(false)}
-          onCreate={handleCreate}
-        />
+        <CreateRoomModal library={library} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
+      )}
+      {renamingRoom && (
+        <RenameModal current={renamingRoom.name} label="room" onClose={() => setRenamingRoom(null)} onRename={(name) => handleRename(renamingRoom.id, name)} />
       )}
     </div>
   );

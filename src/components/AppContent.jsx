@@ -18,7 +18,23 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-function LibraryCard({ lib, noteCount, onDelete, onOpen }) {
+function RenameModal({ current, onClose, onRename }) {
+  const [name, setName] = useState(current);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm modal-fade-in" />
+      <div className="relative w-full sm:max-w-sm bg-[var(--bg)] rounded-t-3xl sm:rounded-3xl z-10 modal-slide-up px-6 pt-5 pb-8" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-center mb-5 sm:hidden"><div className="w-10 h-1 bg-[var(--border)] rounded-full" /></div>
+        <h2 className="text-lg font-bold text-[var(--text-h)] mb-4">Rename library</h2>
+        <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && onRename(name.trim())}
+          maxLength={32} className="w-full px-4 py-3 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-[var(--accent)] transition-colors text-sm mb-4" />
+        <button onClick={() => name.trim() && onRename(name.trim())} disabled={!name.trim()} className="w-full py-3 rounded-2xl bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-30">Save</button>
+      </div>
+    </div>
+  );
+}
+
+function LibraryCard({ lib, noteCount, onDelete, onOpen, onRename }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -64,12 +80,16 @@ function LibraryCard({ lib, noteCount, onDelete, onOpen }) {
             onClick={(e) => e.stopPropagation()}
           >
             {!confirmDelete ? (
-              <button
-                onClick={handleDeleteClick}
-                className="w-full px-4 py-3 text-sm text-red-500 text-left hover:bg-red-500/10 transition-colors"
-              >
-                🗑 Delete library
-              </button>
+              <>
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(lib); }}
+                  className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
+                  ✏️ Rename
+                </button>
+                <button onClick={handleDeleteClick}
+                  className="w-full px-4 py-3 text-sm text-red-500 text-left hover:bg-red-500/10 transition-colors">
+                  🗑 Delete library
+                </button>
+              </>
             ) : (
               <div className="p-3 flex flex-col gap-2">
                 <p className="text-xs text-[var(--text)] text-center leading-snug">
@@ -227,6 +247,7 @@ function CreateLibraryModal({ onClose, onCreate }) {
 export default function AppContent({ onLock }) {
   const [libraries, setLibraries] = useState(() => getStore().libraries || []);
   const [showCreate, setShowCreate] = useState(false);
+  const [renamingLib, setRenamingLib] = useState(null);
   const [view, setView] = useState('libraries');
   const [activeLibrary, setActiveLibrary] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
@@ -265,6 +286,11 @@ export default function AppContent({ onLock }) {
     };
     persistLibraries([...libraries, newLib]);
     setShowCreate(false);
+  };
+
+  const handleRename = (id, name) => {
+    persistLibraries(libraries.map((l) => l.id === id ? { ...l, name } : l));
+    setRenamingLib(null);
   };
 
   const handleDelete = (id) => {
@@ -341,6 +367,7 @@ export default function AppContent({ onLock }) {
                 noteCount={noteCount(lib.id)}
                 onDelete={handleDelete}
                 onOpen={() => { setActiveLibrary(lib); setView('rooms'); }}
+                onRename={setRenamingLib}
               />
             ))}
           </div>
@@ -355,6 +382,10 @@ export default function AppContent({ onLock }) {
         >
           +
         </button>
+      )}
+
+      {renamingLib && (
+        <RenameModal current={renamingLib.name} onClose={() => setRenamingLib(null)} onRename={(name) => handleRename(renamingLib.id, name)} />
       )}
 
       {/* ── Create modal ── */}

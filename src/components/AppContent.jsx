@@ -253,6 +253,7 @@ export default function AppContent({ onLock }) {
   const [activeRoom, setActiveRoom] = useState(null);
   const importRef = useRef(null);
   const [importMsg, setImportMsg] = useState('');
+  const [libSearch, setLibSearch] = useState('');
 
   if (view === 'notes') {
     return (
@@ -328,6 +329,10 @@ export default function AppContent({ onLock }) {
   const roomCount = (libId) =>
     (getStore().rooms || []).filter((r) => r.libraryId === libId).length;
 
+  const filteredLibs = libSearch.trim()
+    ? libraries.filter((l) => l.name.toLowerCase().includes(libSearch.toLowerCase()))
+    : libraries;
+
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
 
@@ -338,7 +343,7 @@ export default function AppContent({ onLock }) {
             SR Library
           </h1>
           <p className="text-xs text-[var(--text)] opacity-50">
-            {libraries.length} {libraries.length === 1 ? 'library' : 'libraries'}
+            {libSearch.trim() ? `${filteredLibs.length} of ${libraries.length}` : `${libraries.length}`} {libraries.length === 1 ? 'library' : 'libraries'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -374,6 +379,24 @@ export default function AppContent({ onLock }) {
 
       {/* ── Main ── */}
       <main className="flex-1 px-4 py-5">
+        {libraries.length > 0 && (
+          <div className="mb-4">
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-40">🔍</span>
+              <input type="text" value={libSearch} onChange={(e) => setLibSearch(e.target.value)}
+                placeholder="Search libraries…"
+                className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-sm text-[var(--text-h)] placeholder:text-[var(--text)] placeholder:opacity-40 outline-none focus:border-[var(--accent)] transition-colors" />
+              {libSearch && (
+                <button onClick={() => setLibSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text)] opacity-40 hover:opacity-70">✕</button>
+              )}
+            </div>
+            {libSearch.trim() && (
+              <p className="text-xs mt-1.5 px-1" style={{ color: filteredLibs.length > 0 ? 'var(--accent)' : 'var(--text)', opacity: filteredLibs.length > 0 ? 0.7 : 0.4 }}>
+                {filteredLibs.length > 0 ? `${filteredLibs.length} librar${filteredLibs.length > 1 ? 'ies' : 'y'} found` : 'No libraries found'}
+              </p>
+            )}
+          </div>
+        )}
         {libraries.length === 0 ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
@@ -395,8 +418,11 @@ export default function AppContent({ onLock }) {
           </div>
         ) : (
           /* Library grid */
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {libraries.map((lib) => (
+          filteredLibs.length === 0 && libSearch.trim() ? (
+            <p className="text-center text-sm text-[var(--text)] opacity-40 mt-12">No libraries match "{libSearch}"</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {filteredLibs.map((lib) => (
               <LibraryCard
                 key={lib.id}
                 lib={lib}
@@ -407,7 +433,8 @@ export default function AppContent({ onLock }) {
                 onRename={setRenamingLib}
               />
             ))}
-          </div>
+            </div>
+          )
         )}
       </main>
 

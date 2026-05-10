@@ -40,9 +40,13 @@ function Hl({ text, q }) {
 }
 
 /* ── Fixed button stack  ← above primary ─────────────────── */
-function FloatStack({ onBack, onPrimary, primaryLabel, accentColor }) {
+function FloatStack({ onBack, onPrimary, primaryLabel, accentColor, bottom = 24 }) {
   return (
-    <div className="fixed bottom-6 right-5 flex flex-col items-center gap-3 z-20">
+    <div style={{ bottom }} className="fixed right-5 flex flex-col items-center gap-3 z-20">
+      <button onClick={onBack}
+        className="w-12 h-12 rounded-full bg-[var(--code-bg)] border border-[var(--border)] shadow-md text-[var(--text-h)] text-base flex items-center justify-center active:scale-90 transition-transform hover:opacity-70">
+        ←
+      </button>
       {onPrimary && (
         <button onClick={onPrimary}
           className="w-14 h-14 rounded-full text-white shadow-xl text-2xl flex items-center justify-center active:scale-90 transition-transform"
@@ -50,28 +54,49 @@ function FloatStack({ onBack, onPrimary, primaryLabel, accentColor }) {
           {primaryLabel}
         </button>
       )}
-      <button onClick={onBack}
-        className="w-12 h-12 rounded-full bg-[var(--code-bg)] border border-[var(--border)] shadow-md text-[var(--text-h)] text-base flex items-center justify-center active:scale-90 transition-transform hover:opacity-70">
-        ←
-      </button>
     </div>
   );
 }
 
-/* ── Breadcrumb header (no back btn) ──────────────────────── */
-function ViewHeader({ library, room, right }) {
+/* ── Breadcrumb header ────────────────────────────────────── */
+function ViewHeader({ library, room, right, extra }) {
   return (
-    <header className="sticky top-0 z-10 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 py-3 flex items-center justify-between">
-      <div className="min-w-0">
-        <h1 className="text-base font-bold text-[var(--text-h)] leading-tight flex items-center gap-1.5 truncate">
-          <span>{room.icon}</span> {room.name}
-        </h1>
-        <p className="text-xs text-[var(--text)] opacity-50 truncate">
-          {library.icon} {library.name}
-        </p>
+    <header className="sticky top-0 z-10 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)]">
+      <div className="px-4 py-3 flex items-center justify-between">
+        <div className="min-w-0 flex-1 mr-2">
+          <h1 className="text-base font-bold text-[var(--text-h)] leading-tight flex items-center gap-1.5 truncate">
+            <span>{room.icon}</span> {room.name}
+          </h1>
+          <p className="text-xs text-[var(--text)] opacity-50 truncate">
+            {library.icon} {library.name}
+          </p>
+        </div>
+        {right}
       </div>
-      {right}
+      {extra}
     </header>
+  );
+}
+
+/* ── Inline image + text renderer ─────────────────────────── */
+function ContentWithImages({ content, images, search }) {
+  const imgMap = Object.fromEntries((images || []).map((im) => [im.id, im]));
+  const parts = content.split(/(\[image:[a-z0-9]+\])/gi);
+  return (
+    <div className="text-[15px] text-[var(--text)] leading-[1.9]">
+      {parts.map((part, i) => {
+        const m = part.match(/^\[image:([a-z0-9]+)\]$/i);
+        if (m) {
+          const im = imgMap[m[1]];
+          return im
+            ? <img key={i} src={im.dataUrl} alt="" className="w-full rounded-2xl my-4 border border-[var(--border)] block" />
+            : null;
+        }
+        return part
+          ? <span key={i} className="whitespace-pre-wrap">{search ? <Hl text={part} q={search} /> : part}</span>
+          : null;
+      })}
+    </div>
   );
 }
 
@@ -84,6 +109,7 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
   const [uploading, setUploading] = useState(false);
   const debRef = useRef(null);
   const fileRef = useRef(null);
+  const taRef = useRef(null);
 
   const save = (t, c, imgs) => {
     setSaved(false);
@@ -91,35 +117,60 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
     debRef.current = setTimeout(() => { onSave(note.id, t, c, imgs); setSaved(true); }, 600);
   };
 
-  const handleBack = () => { clearTimeout(debRef.current); onSave(note.id, title, content, images); onBack(); };
+  const handleBack = () => {
+    clearTimeout(debRef.current);
+    const referenced = new Set([...content.matchAll(/\[image:([a-z0-9]+)\]/gi)].map((m) => m[1]));
+    const cleanedImgs = images.filter((im) => referenced.has(im.id));
+    onSave(note.id, title, content, cleanedImgs);
+    onBack();
+  };
   useEffect(() => () => clearTimeout(debRef.current), []);
 
   const handleImage = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
+    const fr = new FileReader();
+    fr.onload = async (ev) => {
       const compressed = await compressImage(ev.target.result);
-      const newImgs = [...images, { id: genId(), dataUrl: compressed }];
-      setImages(newImgs); save(title, content, newImgs); setUploading(false);
+      const id = genId();
+      const newImg = { id, dataUrl: compressed };
+      const newImgs = [...images, newImg];
+      setImages(newImgs);
+      const ta = taRef.current;
+      const pos = ta ? ta.selectionStart : content.length;
+      const marker = `\n[image:${id}]\n`;
+      const newC = content.slice(0, pos) + marker + content.slice(pos);
+      setContent(newC);
+      save(title, newC, newImgs);
+      setUploading(false);
+      requestAnimationFrame(() => {
+        if (ta) { ta.selectionStart = ta.selectionEnd = pos + marker.length; ta.focus(); }
+      });
     };
-    reader.readAsDataURL(file);
+    fr.readAsDataURL(file);
     e.target.value = '';
   };
 
-  const removeImg = (id) => {
-    const newImgs = images.filter((img) => img.id !== id);
-    setImages(newImgs); save(title, content, newImgs);
-  };
+  const strippedContent = content.replace(/\[image:[a-z0-9]+\]/gi, '');
+  const imgCount = [...content.matchAll(/\[image:[a-z0-9]+\]/gi)].length;
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
       <ViewHeader library={library} room={room}
-        right={<span className={`text-xs text-[var(--text)] transition-opacity ${saved ? 'opacity-30' : 'opacity-60'}`}>
-          {saved ? 'Saved' : 'Saving…'}
-        </span>} />
+        right={
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={() => fileRef.current.click()} disabled={uploading} title="Insert image at cursor"
+              className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-base hover:opacity-70 transition-opacity disabled:opacity-30">
+              {uploading ? '⏳' : '🖼'}
+            </button>
+            <span className={`text-xs text-[var(--text)] transition-opacity ${saved ? 'opacity-30' : 'opacity-60'}`}>
+              {saved ? 'Saved' : 'Saving…'}
+            </span>
+          </div>
+        } />
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleImage} />
 
-      <div className="flex-1 flex flex-col px-5 pt-5 pb-36">
+      <div className="flex-1 flex flex-col px-5 pt-5 pb-16">
         <input autoFocus type="text" value={title}
           onChange={(e) => { setTitle(e.target.value); save(e.target.value, content, images); }}
           placeholder="Untitled"
@@ -129,55 +180,52 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: room.accent }} />
           <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
-        <textarea value={content}
+        <textarea ref={taRef} value={content}
           onChange={(e) => { setContent(e.target.value); save(title, e.target.value, images); }}
-          placeholder="Start writing…"
-          className="flex-1 min-h-[50vh] w-full text-[15px] text-[var(--text)] bg-transparent outline-none border-none resize-none placeholder:text-[var(--text)] placeholder:opacity-25 leading-[1.8]" />
-
-        {/* Images */}
-        {images.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {images.map((img) => (
-              <div key={img.id} className="relative rounded-xl overflow-hidden aspect-video bg-[var(--code-bg)]">
-                <img src={img.dataUrl} alt="" className="w-full h-full object-cover" />
-                <button onClick={() => removeImg(img.id)}
-                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors">
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Add image */}
-        <button onClick={() => fileRef.current.click()} disabled={uploading}
-          className="mt-4 self-start flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--code-bg)] text-[var(--text)] text-sm hover:opacity-70 transition-opacity disabled:opacity-40">
-          {uploading ? '⏳' : '🖼'} {uploading ? 'Compressing…' : 'Add image'}
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleImage} />
+          placeholder="Start writing… tap 🖼 in the header to insert an image at cursor position"
+          className="flex-1 min-h-[55vh] w-full text-[15px] text-[var(--text)] bg-transparent outline-none border-none resize-none placeholder:text-[var(--text)] placeholder:opacity-20 leading-[1.8]" />
       </div>
 
-      <div className="fixed bottom-20 left-0 right-0 px-5 py-2 bg-[var(--bg)]/80 backdrop-blur-sm border-t border-[var(--border)] flex justify-center pointer-events-none">
+      <div className="fixed bottom-0 left-0 right-0 z-10 h-10 px-5 bg-[var(--bg)]/90 backdrop-blur-sm border-t border-[var(--border)] flex items-center justify-center pointer-events-none">
         <p className="text-xs text-[var(--text)] opacity-30">
-          {wordCount(content)} words · {content.length} chars
-          {images.length > 0 && ` · ${images.length} image${images.length > 1 ? 's' : ''}`}
+          {wordCount(strippedContent)} words · {strippedContent.length} chars
+          {imgCount > 0 && ` · ${imgCount} image${imgCount > 1 ? 's' : ''}`}
         </p>
       </div>
 
-      <FloatStack onBack={handleBack} accentColor={room.accent} />
+      <FloatStack onBack={handleBack} accentColor={room.accent} bottom={56} />
     </div>
   );
 }
 
 /* ── Note Reader ──────────────────────────────────────────── */
-function NoteReader({ note, room, library, search, onBack, onEdit }) {
+function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit }) {
+  const [search, setSearch] = useState(outerSearch || '');
+  const rawText = note.content.replace(/\[image:[a-z0-9]+\]/gi, '');
+  const imgCount = (note.images || []).length;
+
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
-      <ViewHeader library={library} room={room} right={null} />
+      <ViewHeader library={library} room={room} right={null}
+        extra={
+          <div className="px-4 pb-2.5">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-40">🔍</span>
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Find in note…"
+                className="w-full pl-7 pr-8 py-2 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-xs text-[var(--text-h)] placeholder:text-[var(--text)] placeholder:opacity-40 outline-none focus:border-[var(--accent)] transition-colors" />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--text)] opacity-40 hover:opacity-70">✕</button>
+              )}
+            </div>
+          </div>
+        } />
 
-      <article className="flex-1 px-5 pt-6 pb-36">
+      <article className="flex-1 px-5 pt-6 pb-16">
         <h1 className="text-2xl font-bold text-[var(--text-h)] mb-3 leading-tight">
-          {note.title || <span className="opacity-30 italic">Untitled</span>}
+          {note.title
+            ? (search ? <Hl text={note.title} q={search} /> : note.title)
+            : <span className="opacity-30 italic">Untitled</span>}
         </h1>
         <div className="flex items-center gap-3 mb-6">
           <div className="h-px flex-1 bg-[var(--border)]" />
@@ -185,31 +233,18 @@ function NoteReader({ note, room, library, search, onBack, onEdit }) {
           <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
 
-        {note.content ? (
-          <p className="text-[15px] text-[var(--text)] leading-[1.9] whitespace-pre-wrap">
-            <Hl text={note.content} q={search} />
-          </p>
-        ) : (
-          <p className="text-sm text-[var(--text)] opacity-30 italic">This note is empty.</p>
-        )}
-
-        {note.images?.length > 0 && (
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {note.images.map((img) => (
-              <img key={img.id} src={img.dataUrl} alt=""
-                className="w-full rounded-2xl object-cover shadow-sm border border-[var(--border)]" />
-            ))}
-          </div>
-        )}
-
-        <div className="mt-8 pt-5 border-t border-[var(--border)] flex items-center gap-4 text-xs text-[var(--text)] opacity-40">
-          <span>Updated {timeAgo(note.updatedAt)}</span>
-          {wordCount(note.content) > 0 && <span>{wordCount(note.content)} words</span>}
-          {note.images?.length > 0 && <span>{note.images.length} image{note.images.length > 1 ? 's' : ''}</span>}
-        </div>
+        {note.content
+          ? <ContentWithImages content={note.content} images={note.images} search={search} />
+          : <p className="text-sm text-[var(--text)] opacity-30 italic">This note is empty.</p>}
       </article>
 
-      <FloatStack onBack={onBack} onPrimary={onEdit} primaryLabel="✏️" accentColor={room.accent} />
+      <div className="fixed bottom-0 left-0 right-0 z-10 h-10 px-5 bg-[var(--bg)]/90 backdrop-blur-sm border-t border-[var(--border)] flex items-center justify-center gap-4">
+        <span className="text-xs text-[var(--text)] opacity-35">Updated {timeAgo(note.updatedAt)}</span>
+        {wordCount(rawText) > 0 && <span className="text-xs text-[var(--text)] opacity-35">{wordCount(rawText)} words</span>}
+        {imgCount > 0 && <span className="text-xs text-[var(--text)] opacity-35">{imgCount} image{imgCount > 1 ? 's' : ''}</span>}
+      </div>
+
+      <FloatStack onBack={onBack} onPrimary={onEdit} primaryLabel="✏️" accentColor={room.accent} bottom={56} />
     </div>
   );
 }
@@ -302,12 +337,12 @@ export default function NotesView({ room, library, onBack }) {
                           <p className={`font-semibold text-sm mb-1 leading-tight ${note.title ? 'text-[var(--text-h)]' : 'text-[var(--text)] opacity-30'}`}>
                             {note.title ? <Hl text={note.title} q={search} /> : 'Untitled'}
                           </p>
-                          {note.content
-                            ? <p className="text-xs text-[var(--text)] opacity-55 line-clamp-2 leading-relaxed"><Hl text={note.content} q={search} /></p>
-                            : <p className="text-xs text-[var(--text)] opacity-25 italic">Empty note</p>}
+                          {(() => { const preview = note.content.replace(/\[image:[a-z0-9]+\]/gi, '').trim(); return preview
+                            ? <p className="text-xs text-[var(--text)] opacity-55 line-clamp-2 leading-relaxed"><Hl text={preview} q={search} /></p>
+                            : <p className="text-xs text-[var(--text)] opacity-25 italic">Empty note</p>; })()}
                           <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                             <span className="text-xs text-[var(--text)] opacity-30">{timeAgo(note.updatedAt)}</span>
-                            {wordCount(note.content) > 0 && <span className="text-xs text-[var(--text)] opacity-30">{wordCount(note.content)} words</span>}
+                            {wordCount(note.content.replace(/\[image:[a-z0-9]+\]/gi, '')) > 0 && <span className="text-xs text-[var(--text)] opacity-30">{wordCount(note.content.replace(/\[image:[a-z0-9]+\]/gi, ''))} words</span>}
                             {note.images?.length > 0 && <span className="text-xs text-[var(--text)] opacity-30">🖼 {note.images.length}</span>}
                           </div>
                         </div>

@@ -57,10 +57,10 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename }) 
   };
 
   return (
-    <div onClick={onOpen} className="rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--bg)] cursor-pointer active:scale-[0.97] transition-transform relative select-none">
+    <div onClick={onOpen} className="rounded-2xl border border-[var(--border)] bg-[var(--bg)] cursor-pointer active:scale-[0.97] transition-transform relative select-none">
       {/* Coloured header */}
       <div
-        className="h-24 flex items-center justify-center relative overflow-hidden"
+        className="h-24 flex items-center justify-center relative rounded-t-2xl overflow-hidden"
         style={{ background: `linear-gradient(135deg, ${lib.accent}38, ${lib.accent}18)` }}
       >
         <span className="text-4xl z-10">{lib.icon}</span>
@@ -72,11 +72,12 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename }) 
         >
           ···
         </button>
+      </div>
 
-        {/* Dropdown */}
+        {/* Dropdown — outside banner so it isn't clipped */}
         {menuOpen && (
           <div
-            className="absolute top-9 right-2 z-30 bg-[var(--bg)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden min-w-[150px]"
+            className="absolute top-8 right-2 z-50 bg-[var(--bg)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden min-w-[150px]"
             onClick={(e) => e.stopPropagation()}
           >
             {!confirmDelete ? (
@@ -111,7 +112,6 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename }) 
             )}
           </div>
         )}
-      </div>
 
       {/* Card body */}
       <div className="px-3.5 py-3">

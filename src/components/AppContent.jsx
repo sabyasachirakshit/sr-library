@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { getStore, updateStore, exportStore } from '../store/libraryStore';
+import { useState, useRef } from 'react';
+import { getStore, updateStore, exportStore, importStore } from '../store/libraryStore';
 import RoomsView from './RoomsView';
 import NotesView from './NotesView';
 
@@ -34,7 +34,7 @@ function RenameModal({ current, onClose, onRename }) {
   );
 }
 
-function LibraryCard({ lib, noteCount, onDelete, onOpen, onRename }) {
+function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -123,7 +123,7 @@ function LibraryCard({ lib, noteCount, onDelete, onOpen, onRename }) {
           <h3 className="font-semibold text-[var(--text-h)] truncate text-sm">{lib.name}</h3>
         </div>
         <p className="text-xs text-[var(--text)] opacity-50 pl-4">
-          {noteCount} {noteCount === 1 ? 'note' : 'notes'}
+          {roomCount} {roomCount === 1 ? 'room' : 'rooms'} · {noteCount} {noteCount === 1 ? 'note' : 'notes'}
         </p>
       </div>
     </div>
@@ -251,6 +251,8 @@ export default function AppContent({ onLock }) {
   const [view, setView] = useState('libraries');
   const [activeLibrary, setActiveLibrary] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
+  const importRef = useRef(null);
+  const [importMsg, setImportMsg] = useState('');
 
   if (view === 'notes') {
     return (
@@ -302,8 +304,29 @@ export default function AppContent({ onLock }) {
     });
   };
 
+  const handleImport = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const ok = importStore(ev.target.result);
+      if (ok) {
+        setLibraries(getStore().libraries || []);
+        setImportMsg('Imported!');
+        setTimeout(() => setImportMsg(''), 2500);
+      } else {
+        setImportMsg('Invalid file');
+        setTimeout(() => setImportMsg(''), 2500);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const noteCount = (libId) =>
     (getStore().notes || []).filter((n) => n.libraryId === libId).length;
+
+  const roomCount = (libId) =>
+    (getStore().rooms || []).filter((r) => r.libraryId === libId).length;
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
@@ -319,6 +342,19 @@ export default function AppContent({ onLock }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {importMsg && (
+            <span className={`text-xs px-2 py-1 rounded-lg ${importMsg === 'Imported!' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+              {importMsg}
+            </span>
+          )}
+          <button
+            onClick={() => importRef.current.click()}
+            title="Import JSON backup"
+            className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-base hover:opacity-70 transition-opacity"
+          >
+            ⬆️
+          </button>
+          <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={handleImport} />
           <button
             onClick={exportStore}
             title="Export data as JSON"
@@ -365,6 +401,7 @@ export default function AppContent({ onLock }) {
                 key={lib.id}
                 lib={lib}
                 noteCount={noteCount(lib.id)}
+                roomCount={roomCount(lib.id)}
                 onDelete={handleDelete}
                 onOpen={() => { setActiveLibrary(lib); setView('rooms'); }}
                 onRename={setRenamingLib}

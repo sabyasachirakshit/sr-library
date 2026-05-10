@@ -309,13 +309,14 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
 
       {/* FAB stack: ← above + */}
       <div className="fixed bottom-6 right-5 flex flex-col items-center gap-3 z-20">
-        <button onClick={() => setShowCreate(true)}
-          className="w-14 h-14 rounded-full text-white shadow-xl text-2xl flex items-center justify-center active:scale-90 transition-transform"
-          style={{ backgroundColor: library.accent }}>+</button>
-        <button onClick={onBack}
+      <button onClick={onBack}
           className="w-12 h-12 rounded-full bg-[var(--code-bg)] border border-[var(--border)] shadow-md text-[var(--text-h)] text-base flex items-center justify-center active:scale-90 transition-transform hover:opacity-70">
           ←
         </button>
+        <button onClick={() => setShowCreate(true)}
+          className="w-14 h-14 rounded-full text-white shadow-xl text-2xl flex items-center justify-center active:scale-90 transition-transform"
+          style={{ backgroundColor: library.accent }}>+</button>
+        
       </div>
 
       {showCreate && (

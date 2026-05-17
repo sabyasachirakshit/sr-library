@@ -285,11 +285,21 @@ function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit, 
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
       <ViewHeader library={library} room={room}
         right={
-          <button onClick={handleCopy} title="Copy note"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-xs text-[var(--text-h)] hover:opacity-70 transition-all active:scale-95 flex-shrink-0">
-            {copied ? '✅' : '📋'}
-            <span>{copied ? 'Copied!' : 'Copy'}</span>
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={handleCopy} title="Copy note"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-xs text-[var(--text-h)] hover:opacity-70 transition-all active:scale-95">
+              {copied ? '✅' : '📋'}
+              <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
+            </button>
+            <button onClick={onEdit} title="Edit note"
+              className="w-8 h-8 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] flex items-center justify-center text-sm text-[var(--text-h)] hover:opacity-70 transition-all active:scale-95">
+              ✏️
+            </button>
+            <button onClick={onBack} title="Back"
+              className="w-8 h-8 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] flex items-center justify-center text-sm text-[var(--text-h)] hover:opacity-70 transition-all active:scale-95">
+              ←
+            </button>
+          </div>
         }
         extra={
           <div className="px-4 pb-2.5">
@@ -333,7 +343,6 @@ function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit, 
         {imgCount > 0 && <span className="text-xs text-[var(--text)] opacity-35">{imgCount} image{imgCount > 1 ? 's' : ''}</span>}
       </div>
 
-      <FloatStack onBack={onBack} onPrimary={onEdit} primaryLabel="✏️" accentColor={room.accent} bottom={56} />
     </div>
   );
 }

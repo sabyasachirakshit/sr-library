@@ -83,12 +83,12 @@ function GlobalSearchModal({ onClose, onOpenLibrary, onOpenRoom, onOpenNote }) {
   return (
     <div className="fixed inset-0 z-50 bg-[var(--bg)] flex flex-col">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg)]/90 backdrop-blur-md">
-        <span className="text-lg opacity-40">🔍</span>
+        <button onClick={onClose} className="w-9 h-9 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] flex items-center justify-center text-base text-[var(--text-h)] hover:opacity-70 transition-opacity flex-shrink-0">←</button>
+        <span className="text-base opacity-40">🔍</span>
         <input autoFocus type="text" value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search libraries, rooms, notes…"
+          placeholder="Search database…"
           className="flex-1 bg-transparent outline-none text-[var(--text-h)] text-[15px] placeholder:text-[var(--text)] placeholder:opacity-30" />
-        {query && <button onClick={() => setQuery('')} className="text-xs text-[var(--text)] opacity-40 hover:opacity-80">✕</button>}
-        <button onClick={onClose} className="text-sm px-3 py-1.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text)] hover:opacity-70 transition-opacity">Done</button>
+        {query && <button onClick={() => setQuery('')} className="text-xs text-[var(--text)] opacity-40 hover:opacity-80 flex-shrink-0">✕</button>}
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {!query.trim() ? (

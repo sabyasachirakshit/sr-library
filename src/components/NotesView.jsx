@@ -141,9 +141,13 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
   const [images, setImages] = useState(note.images || []);
   const [saved, setSaved] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [showFR, setShowFR] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
   const debRef = useRef(null);
   const fileRef = useRef(null);
   const taRef = useRef(null);
+  const findRef = useRef(null);
 
   const save = (t, c, imgs) => {
     setSaved(false);
@@ -159,6 +163,35 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
     onBack();
   };
   useEffect(() => () => clearTimeout(debRef.current), []);
+
+  const frMatchCount = findText.trim()
+    ? (content.match(new RegExp(escRe(findText), 'gi')) || []).length
+    : 0;
+
+  const handleReplaceNext = () => {
+    if (!findText.trim() || frMatchCount === 0) return;
+    const ta = taRef.current;
+    const from = ta ? ta.selectionStart : 0;
+    const lower = content.toLowerCase();
+    const fLower = findText.toLowerCase();
+    let idx = lower.indexOf(fLower, from);
+    if (idx === -1) idx = lower.indexOf(fLower, 0); // wrap
+    if (idx === -1) return;
+    const newC = content.slice(0, idx) + replaceText + content.slice(idx + findText.length);
+    setContent(newC);
+    save(title, newC, images);
+    requestAnimationFrame(() => {
+      if (ta) { ta.selectionStart = idx; ta.selectionEnd = idx + replaceText.length; ta.focus(); }
+    });
+  };
+
+  const handleReplaceAll = () => {
+    if (!findText.trim() || frMatchCount === 0) return;
+    const newC = content.replace(new RegExp(escRe(findText), 'gi'), replaceText);
+    setContent(newC);
+    save(title, newC, images);
+    taRef.current?.focus();
+  };
 
   const insertChecklist = () => {
     const ta = taRef.current;
@@ -211,12 +244,51 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
               className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-base hover:opacity-70 transition-opacity disabled:opacity-30">
               {uploading ? '⏳' : '🖼'}
             </button>
+            <button onClick={() => { setShowFR(v => !v); requestAnimationFrame(() => findRef.current?.focus()); }} title="Find & Replace"
+              className={`w-9 h-9 rounded-xl flex items-center justify-center text-base transition-opacity hover:opacity-70 ${
+                showFR ? 'bg-[var(--accent)] text-white' : 'bg-[var(--code-bg)]'
+              }`}>
+              🔍
+            </button>
             <span className={`text-xs text-[var(--text)] transition-opacity ${saved ? 'opacity-30' : 'opacity-60'}`}>
               {saved ? 'Saved' : 'Saving…'}
             </span>
           </div>
         } />
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleImage} />
+
+      {showFR && (
+        <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--code-bg)] flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input ref={findRef} value={findText} onChange={(e) => setFindText(e.target.value)}
+                placeholder="Find…"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text-h)] outline-none focus:border-[var(--accent)] transition-colors pr-10" />
+              {findText && (
+                <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold ${
+                  frMatchCount > 0 ? 'text-[var(--accent)]' : 'text-red-400'
+                }`}>{frMatchCount}</span>
+              )}
+            </div>
+            <button onClick={() => { setShowFR(false); setFindText(''); setReplaceText(''); }}
+              className="text-xs text-[var(--text)] opacity-40 hover:opacity-80 px-1">✕</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input value={replaceText} onChange={(e) => setReplaceText(e.target.value)}
+              placeholder="Replace with…"
+              onKeyDown={(e) => e.key === 'Enter' && handleReplaceNext()}
+              className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text-h)] outline-none focus:border-[var(--accent)] transition-colors" />
+            <button onClick={handleReplaceNext} disabled={!findText.trim() || frMatchCount === 0}
+              className="px-3 py-2 rounded-xl bg-[var(--bg)] border border-[var(--border)] text-xs text-[var(--text-h)] hover:opacity-70 transition-all disabled:opacity-30 whitespace-nowrap">
+              Replace
+            </button>
+            <button onClick={handleReplaceAll} disabled={!findText.trim() || frMatchCount === 0}
+              className="px-3 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 transition-all disabled:opacity-30 whitespace-nowrap">
+              All
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col px-5 pt-5 pb-16">
         <input autoFocus type="text" value={title}

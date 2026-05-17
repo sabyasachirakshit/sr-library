@@ -30,7 +30,7 @@ async function compressImage(dataUrl, maxPx = 900, q = 0.75) {
   });
 }
 
-function RoomCard({ room, noteCount, onOpen, onDelete, onRename }) {
+function RoomCard({ room, noteCount, onOpen, onDelete, onRename, onArchive }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -78,6 +78,10 @@ function RoomCard({ room, noteCount, onOpen, onDelete, onRename }) {
                 <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(room); }}
                   className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
                   ✏️ Rename
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onArchive(room); }}
+                  className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
+                  📦 Archive
                 </button>
                 <button onClick={handleDeleteClick}
                   className="w-full px-4 py-3 text-sm text-red-500 text-left hover:bg-red-500/10 transition-colors">
@@ -306,6 +310,17 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
     updateStore({ notes: notes.filter((n) => n.roomId !== id) });
   };
 
+  const handleArchiveRoom = (room) => {
+    const store = getStore();
+    const roomNotes = (store.notes || []).filter((n) => n.roomId === room.id);
+    const entry = { id: genId(), type: 'room', archivedAt: new Date().toISOString(), room, notes: roomNotes };
+    updateStore({
+      archives: [...(store.archives || []), entry],
+      notes: (store.notes || []).filter((n) => n.roomId !== room.id),
+    });
+    persistRooms(rooms.filter((r) => r.id !== room.id));
+  };
+
   const handleRename = (id, name) => {
     persistRooms(rooms.map((r) => r.id === id ? { ...r, name } : r));
     setRenamingRoom(null);
@@ -363,6 +378,7 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
                 onOpen={() => onOpenRoom(room)}
                 onDelete={handleDelete}
                 onRename={setRenamingRoom}
+                onArchive={handleArchiveRoom}
               />
             ))}
           </div>

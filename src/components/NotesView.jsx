@@ -451,6 +451,13 @@ export default function NotesView({ room, library, onBack }) {
 
   const handleDelete = (id) => { persist(notes.filter((n) => n.id !== id)); setDeleteConfirm(null); };
 
+  const handleArchiveNote = (note) => {
+    const store = getStore();
+    const entry = { id: genId(), type: 'note', archivedAt: new Date().toISOString(), note };
+    updateStore({ archives: [...(store.archives || []), entry] });
+    persist(notes.filter((n) => n.id !== note.id));
+  };
+
   const handleMove = (noteId, newRoomId, newLibraryId) => {
     const all = getStore().notes || [];
     const updated = all.map((n) => n.id === noteId ? { ...n, roomId: newRoomId, libraryId: newLibraryId } : n);
@@ -533,7 +540,7 @@ export default function NotesView({ room, library, onBack }) {
                           </div>
                         </div>
 
-                        {/* Edit + Move + Delete */}
+                        {/* Edit + Move + Archive + Delete */}
                         <div className="flex flex-col border-l border-[var(--border)] flex-shrink-0">
                           <button onClick={(e) => { e.stopPropagation(); openEdit(note); }}
                             className="flex-1 px-3 flex items-center justify-center text-base text-[var(--text)] hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]"
@@ -541,6 +548,9 @@ export default function NotesView({ room, library, onBack }) {
                           <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); setMovingNote(note); }}
                             className="flex-1 px-3 flex items-center justify-center text-sm text-[var(--text)] hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]"
                             title="Move">↗</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); handleArchiveNote(note); }}
+                            className="flex-1 px-3 flex items-center justify-center text-sm text-[var(--text)] hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]"
+                            title="Archive">📦</button>
                           {deleteConfirm === note.id ? (
                             <div className="flex flex-col flex-1" onClick={(e) => e.stopPropagation()}>
                               <button onClick={() => handleDelete(note.id)} className="flex-1 px-3 flex items-center justify-center text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors border-b border-[var(--border)]">✓</button>

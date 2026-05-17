@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { getStore, updateStore, exportStore, importStore } from '../store/libraryStore';
 import RoomsView from './RoomsView';
 import NotesView from './NotesView';
+import ArchivesView from './ArchivesView';
 
 const ACCENT_COLORS = [
   '#9333ea', '#2563eb', '#16a34a', '#ea580c', '#db2777',
@@ -48,7 +49,7 @@ function RenameModal({ current, onClose, onRename }) {
   );
 }
 
-function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename }) {
+function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename, onArchive }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -101,6 +102,10 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename }) 
                 <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(lib); }}
                   className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
                   ✏️ Rename
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onArchive(lib); }}
+                  className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
+                  📦 Archive
                 </button>
                 <button onClick={handleDeleteClick}
                   className="w-full px-4 py-3 text-sm text-red-500 text-left hover:bg-red-500/10 transition-colors">
@@ -316,6 +321,9 @@ export default function AppContent({ onLock }) {
   const [importMsg, setImportMsg] = useState('');
   const [libSearch, setLibSearch] = useState('');
 
+  if (view === 'archives') {
+    return <ArchivesView onBack={() => setView('libraries')} />;
+  }
   if (view === 'notes') {
     return (
       <NotesView
@@ -367,6 +375,19 @@ export default function AppContent({ onLock }) {
     });
   };
 
+  const handleArchiveLibrary = (lib) => {
+    const store = getStore();
+    const libRooms = (store.rooms || []).filter((r) => r.libraryId === lib.id);
+    const libNotes = (store.notes || []).filter((n) => n.libraryId === lib.id);
+    const entry = { id: genId(), type: 'library', archivedAt: new Date().toISOString(), library: lib, rooms: libRooms, notes: libNotes };
+    updateStore({
+      archives: [...(store.archives || []), entry],
+      rooms: (store.rooms || []).filter((r) => r.libraryId !== lib.id),
+      notes: (store.notes || []).filter((n) => n.libraryId !== lib.id),
+    });
+    persistLibraries(libraries.filter((l) => l.id !== lib.id));
+  };
+
   const handleImport = (e) => {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
@@ -414,6 +435,13 @@ export default function AppContent({ onLock }) {
               {importMsg}
             </span>
           )}
+          <button
+            onClick={() => setView('archives')}
+            title="Archives"
+            className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-base hover:opacity-70 transition-opacity"
+          >
+            📦
+          </button>
           <button
             onClick={() => importRef.current.click()}
             title="Import JSON backup"
@@ -493,6 +521,7 @@ export default function AppContent({ onLock }) {
                 onDelete={handleDelete}
                 onOpen={() => { setActiveLibrary(lib); setView('rooms'); }}
                 onRename={setRenamingLib}
+                onArchive={handleArchiveLibrary}
               />
             ))}
             </div>

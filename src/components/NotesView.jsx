@@ -285,6 +285,78 @@ function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit }
   );
 }
 
+/* ── Move Note Modal ─────────────────────────────────────── */
+function MoveNoteModal({ note, currentRoom, onClose, onMove }) {
+  const store = getStore();
+  const libraries = store.libraries || [];
+  const allRooms = store.rooms || [];
+  const [selectedLibId, setSelectedLibId] = useState('');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
+  const targetRooms = selectedLibId ? allRooms.filter((r) => r.libraryId === selectedLibId) : [];
+  const canMove = selectedRoomId && selectedRoomId !== currentRoom.id;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm modal-fade-in" />
+      <div className="relative w-full sm:max-w-md bg-[var(--bg)] rounded-t-3xl sm:rounded-3xl z-10 modal-slide-up px-6 pt-5 pb-8"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-center mb-4 sm:hidden">
+          <div className="w-10 h-1 bg-[var(--border)] rounded-full" />
+        </div>
+        <h2 className="text-lg font-bold text-[var(--text-h)] mb-1">Move Note</h2>
+        <p className="text-xs text-[var(--text)] opacity-50 mb-5 truncate">“{note.title || 'Untitled'}”</p>
+
+        <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2 block">Library</label>
+        <div className="flex flex-col gap-1.5 mb-4 max-h-44 overflow-y-auto">
+          {libraries.map((lib) => (
+            <button key={lib.id} onClick={() => { setSelectedLibId(lib.id); setSelectedRoomId(''); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all text-left ${
+                selectedLibId === lib.id
+                  ? 'bg-[var(--accent)]/15 border border-[var(--accent)] text-[var(--text-h)]'
+                  : 'bg-[var(--code-bg)] border border-transparent text-[var(--text)] hover:border-[var(--border)]'
+              }`}>
+              <span>{lib.icon}</span>
+              <span className="truncate">{lib.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {selectedLibId && (
+          <>
+            <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2 block">Room</label>
+            {targetRooms.length === 0
+              ? <p className="text-xs text-[var(--text)] opacity-40 mb-4 px-1">No rooms in this library</p>
+              : (
+                <div className="flex flex-col gap-1.5 mb-5 max-h-44 overflow-y-auto">
+                  {targetRooms.map((rm) => (
+                    <button key={rm.id} onClick={() => rm.id !== currentRoom.id && setSelectedRoomId(rm.id)}
+                      disabled={rm.id === currentRoom.id}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all text-left ${
+                        rm.id === currentRoom.id
+                          ? 'opacity-30 cursor-not-allowed bg-[var(--code-bg)] border border-transparent'
+                          : selectedRoomId === rm.id
+                            ? 'bg-[var(--accent)]/15 border border-[var(--accent)] text-[var(--text-h)]'
+                            : 'bg-[var(--code-bg)] border border-transparent text-[var(--text)] hover:border-[var(--border)]'
+                      }`}>
+                      <span>{rm.icon}</span>
+                      <span className="truncate flex-1">{rm.name}</span>
+                      {rm.id === currentRoom.id && <span className="text-xs opacity-40">current</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+          </>
+        )}
+
+        <button onClick={() => canMove && onMove(note.id, selectedRoomId, selectedLibId)} disabled={!canMove}
+          className="w-full py-3.5 rounded-2xl bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-95 transition-all">
+          Move Note
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Notes List View (default export) ────────────────────── */
 export default function NotesView({ room, library, onBack }) {
   const [notes, setNotes] = useState(() =>
@@ -294,6 +366,7 @@ export default function NotesView({ room, library, onBack }) {
   const [mode, setMode] = useState('list'); // list | read | edit
   const [activeNote, setActiveNote] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [movingNote, setMovingNote] = useState(null);
   const [search, setSearch] = useState('');
 
   const persist = (updated) => {
@@ -315,6 +388,14 @@ export default function NotesView({ room, library, onBack }) {
   };
 
   const handleDelete = (id) => { persist(notes.filter((n) => n.id !== id)); setDeleteConfirm(null); };
+
+  const handleMove = (noteId, newRoomId, newLibraryId) => {
+    const all = getStore().notes || [];
+    const updated = all.map((n) => n.id === noteId ? { ...n, roomId: newRoomId, libraryId: newLibraryId } : n);
+    updateStore({ notes: updated });
+    setNotes(notes.filter((n) => n.id !== noteId));
+    setMovingNote(null);
+  };
 
   const openRead = (note) => { setActiveNote(note); setMode('read'); };
   const openEdit = (note) => { setActiveNote(note); setMode('edit'); };
@@ -390,13 +471,14 @@ export default function NotesView({ room, library, onBack }) {
                           </div>
                         </div>
 
-                        {/* Edit + Delete */}
+                        {/* Edit + Move + Delete */}
                         <div className="flex flex-col border-l border-[var(--border)] flex-shrink-0">
                           <button onClick={(e) => { e.stopPropagation(); openEdit(note); }}
                             className="flex-1 px-3 flex items-center justify-center text-base text-[var(--text)] hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]"
-                            title="Edit">
-                            ✏️
-                          </button>
+                            title="Edit">✏️</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); setMovingNote(note); }}
+                            className="flex-1 px-3 flex items-center justify-center text-sm text-[var(--text)] hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]"
+                            title="Move">↗</button>
                           {deleteConfirm === note.id ? (
                             <div className="flex flex-col flex-1" onClick={(e) => e.stopPropagation()}>
                               <button onClick={() => handleDelete(note.id)} className="flex-1 px-3 flex items-center justify-center text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors border-b border-[var(--border)]">✓</button>
@@ -405,9 +487,7 @@ export default function NotesView({ room, library, onBack }) {
                           ) : (
                             <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(note.id); }}
                               className="flex-1 px-3 flex items-center justify-center text-base text-[var(--text)] hover:bg-red-500/10 hover:text-red-500 transition-colors"
-                              title="Delete">
-                              🗑
-                            </button>
+                              title="Delete">🗑</button>
                           )}
                         </div>
                       </div>
@@ -420,6 +500,15 @@ export default function NotesView({ room, library, onBack }) {
       </main>
 
       <FloatStack onBack={onBack} onPrimary={handleCreate} primaryLabel="+" accentColor={room.accent} />
+
+      {movingNote && (
+        <MoveNoteModal
+          note={movingNote}
+          currentRoom={room}
+          onClose={() => setMovingNote(null)}
+          onMove={handleMove}
+        />
+      )}
     </div>
   );
 }

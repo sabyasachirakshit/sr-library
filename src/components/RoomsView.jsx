@@ -52,7 +52,7 @@ function RoomCard({ room, noteCount, onOpen, onDelete, onRename, onArchive }) {
       className="rounded-2xl border border-[var(--border)] bg-[var(--bg)] cursor-pointer active:scale-[0.97] transition-transform relative select-none"
     >
       <div
-        className="h-24 flex items-center justify-center relative rounded-t-2xl overflow-hidden"
+        className="h-36 flex items-center justify-center relative rounded-t-2xl overflow-hidden"
         style={room.coverImage ? {} : { background: `linear-gradient(135deg, ${room.accent}38, ${room.accent}18)` }}
       >
         {room.coverImage

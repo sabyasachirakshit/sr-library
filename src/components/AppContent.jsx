@@ -75,7 +75,7 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename, on
     <div onClick={onOpen} className="rounded-2xl border border-[var(--border)] bg-[var(--bg)] cursor-pointer active:scale-[0.97] transition-transform relative select-none">
       {/* Coloured header */}
       <div
-        className="h-24 flex items-center justify-center relative rounded-t-2xl overflow-hidden"
+        className="h-36 flex items-center justify-center relative rounded-t-2xl overflow-hidden"
         style={lib.coverImage ? {} : { background: `linear-gradient(135deg, ${lib.accent}38, ${lib.accent}18)` }}
       >
         {lib.coverImage

@@ -113,7 +113,7 @@ function RoomCard({ room, noteCount, onOpen, onDelete, onEdit, onArchive }) {
       <div className="px-3.5 py-3">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: room.accent }} />
-          <h3 className="font-semibold text-[var(--text-h)] truncate text-sm">{room.name}</h3>
+          <h3 className="font-semibold text-[var(--text-h)] text-xs leading-snug line-clamp-2">{room.name}</h3>
         </div>
         <p className="text-xs text-[var(--text)] opacity-50 pl-4">
           {noteCount} {noteCount === 1 ? 'note' : 'notes'}

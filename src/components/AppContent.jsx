@@ -293,6 +293,12 @@ function CreateLibraryModal({ onClose, onCreate }) {
           >
             Create Library
           </button>
+          <button
+            onClick={onClose}
+            className="w-full mt-2 py-3 rounded-2xl bg-[var(--code-bg)] text-[var(--text)] text-sm font-medium hover:opacity-70 active:scale-95 transition-all"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>

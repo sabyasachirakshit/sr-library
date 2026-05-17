@@ -35,6 +35,31 @@ function getSub(a) {
   }
   return (a.note.content || '').replace(/\[image:[a-z0-9]+\]/gi, '').trim().slice(0, 60) || 'Empty note';
 }
+function getParentContext(a, allArchives) {
+  const store = getStore();
+  if (a.type === 'room') {
+    const lib = (store.libraries || []).find((l) => l.id === a.room.libraryId);
+    if (lib) return `${lib.icon} ${lib.name}`;
+    const archivedLib = allArchives.find((x) => x.type === 'library' && x.library.id === a.room.libraryId);
+    if (archivedLib) return `${archivedLib.library.icon} ${archivedLib.library.name} (archived)`;
+    return 'Unknown library';
+  }
+  if (a.type === 'note') {
+    const room = (store.rooms || []).find((r) => r.id === a.note.roomId);
+    const lib = (store.libraries || []).find((l) => l.id === a.note.libraryId);
+    const archivedRoom = !room ? allArchives.find((x) => x.type === 'room' && x.room.id === a.note.roomId) : null;
+    const archivedLib = !lib ? allArchives.find((x) => x.type === 'library' && x.library.id === a.note.libraryId) : null;
+    const roomLabel = room
+      ? `${room.icon} ${room.name}`
+      : archivedRoom ? `${archivedRoom.room.icon} ${archivedRoom.room.name} (archived)` : 'Unknown room';
+    const libLabel = lib
+      ? `${lib.icon} ${lib.name}`
+      : archivedLib ? `${archivedLib.library.icon} ${archivedLib.library.name} (archived)` : 'Unknown library';
+    return `${libLabel}  ›  ${roomLabel}`;
+  }
+  return null;
+}
+
 function getMissingParentWarning(a) {
   const store = getStore();
   if (a.type === 'room') {
@@ -127,6 +152,7 @@ export default function ArchivesView({ onBack }) {
           <div className="flex flex-col gap-2.5">
             {sorted.map((archive) => {
               const warning = getMissingParentWarning(archive);
+              const parentCtx = getParentContext(archive, archives);
               return (
                 <div key={archive.id} className="rounded-2xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
                   <div className="flex items-stretch">
@@ -144,6 +170,9 @@ export default function ArchivesView({ onBack }) {
                         </span>
                       </div>
                       <p className="text-xs text-[var(--text)] opacity-50 truncate">{getSub(archive)}</p>
+                      {parentCtx && (
+                        <p className="text-[11px] text-[var(--text)] opacity-40 truncate mt-0.5">{parentCtx}</p>
+                      )}
                       <p className="text-xs text-[var(--text)] opacity-30 mt-0.5">Archived {timeAgo(archive.archivedAt)}</p>
                       {warning && (
                         <p className="text-[10px] text-amber-500 mt-1 leading-snug">⚠ {warning}</p>

@@ -484,7 +484,7 @@ function CreateLibraryModal({ onClose, onCreate }) {
   );
 }
 
-export default function AppContent({ onLock }) {
+export default function AppContent() {
   const [libraries, setLibraries] = useState(() => getStore().libraries || []);
   const [showCreate, setShowCreate] = useState(false);
   const [editingLib, setEditingLib] = useState(null);
@@ -649,13 +649,6 @@ export default function AppContent({ onLock }) {
             className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-base hover:opacity-70 transition-opacity"
           >
             ⬇️
-          </button>
-          <button
-            onClick={onLock}
-            title="Lock"
-            className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-base hover:opacity-70 transition-opacity"
-          >
-            🔒
           </button>
         </div>
       </header>

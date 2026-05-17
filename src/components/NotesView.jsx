@@ -430,6 +430,7 @@ export default function NotesView({ room, library, onBack }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [movingNote, setMovingNote] = useState(null);
   const [search, setSearch] = useState('');
+  const [noteSort, setNoteSort] = useState('date');
 
   const persist = (updated) => {
     setNotes(updated);
@@ -469,9 +470,14 @@ export default function NotesView({ room, library, onBack }) {
   const openRead = (note) => { setActiveNote(note); setMode('read'); };
   const openEdit = (note) => { setActiveNote(note); setMode('edit'); };
 
-  const filtered = search.trim()
-    ? notes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase()))
-    : notes;
+  const filtered = (() => {
+    const f = search.trim()
+      ? notes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase()))
+      : [...notes];
+    return f.sort((a, b) => noteSort === 'name'
+      ? (a.title || '').localeCompare(b.title || '')
+      : new Date(b.updatedAt) - new Date(a.updatedAt));
+  })();
 
   if (mode === 'edit' && activeNote)
     return <NoteEditor note={activeNote} room={room} library={library} onBack={() => { setMode(notes.find(n => n.id === activeNote.id)?.content !== undefined ? 'read' : 'list'); }} onSave={handleSave} />;
@@ -513,6 +519,17 @@ export default function NotesView({ room, library, onBack }) {
                   {filtered.length > 0 ? `${filtered.length} note${filtered.length > 1 ? 's' : ''} found` : 'No notes found'}
                 </p>
               )}
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="text-xs text-[var(--text)] opacity-40 mr-0.5">Sort:</span>
+                {['date', 'name'].map((s) => (
+                  <button key={s} onClick={() => setNoteSort(s)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                      noteSort === s ? 'bg-[var(--accent)] text-white' : 'bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text)] hover:opacity-70'
+                    }`}>
+                    {s === 'date' ? 'Date' : 'Name'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {filtered.length === 0

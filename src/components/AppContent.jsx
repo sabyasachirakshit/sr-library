@@ -320,6 +320,7 @@ export default function AppContent({ onLock }) {
   const importRef = useRef(null);
   const [importMsg, setImportMsg] = useState('');
   const [libSearch, setLibSearch] = useState('');
+  const [libSort, setLibSort] = useState('date');
 
   if (view === 'archives') {
     return <ArchivesView onBack={() => {
@@ -415,9 +416,14 @@ export default function AppContent({ onLock }) {
   const roomCount = (libId) =>
     (getStore().rooms || []).filter((r) => r.libraryId === libId).length;
 
-  const filteredLibs = libSearch.trim()
-    ? libraries.filter((l) => l.name.toLowerCase().includes(libSearch.toLowerCase()))
-    : libraries;
+  const filteredLibs = (() => {
+    const f = libSearch.trim()
+      ? libraries.filter((l) => l.name.toLowerCase().includes(libSearch.toLowerCase()))
+      : [...libraries];
+    return f.sort((a, b) => libSort === 'name'
+      ? a.name.localeCompare(b.name)
+      : new Date(b.createdAt) - new Date(a.createdAt));
+  })();
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
@@ -488,6 +494,17 @@ export default function AppContent({ onLock }) {
                 {filteredLibs.length > 0 ? `${filteredLibs.length} librar${filteredLibs.length > 1 ? 'ies' : 'y'} found` : 'No libraries found'}
               </p>
             )}
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-xs text-[var(--text)] opacity-40 mr-0.5">Sort:</span>
+              {['date', 'name'].map((s) => (
+                <button key={s} onClick={() => setLibSort(s)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                    libSort === s ? 'bg-[var(--accent)] text-white' : 'bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text)] hover:opacity-70'
+                  }`}>
+                  {s === 'date' ? 'Date' : 'Name'}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {libraries.length === 0 ? (

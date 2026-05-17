@@ -291,6 +291,7 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
   );
   const [showCreate, setShowCreate] = useState(false);
   const [renamingRoom, setRenamingRoom] = useState(null);
+  const [roomSort, setRoomSort] = useState('date');
 
   const persistRooms = (updated) => {
     setRooms(updated);
@@ -329,6 +330,10 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
   const noteCount = (roomId) =>
     (getStore().notes || []).filter((n) => n.roomId === roomId).length;
 
+  const sortedRooms = [...rooms].sort((a, b) => roomSort === 'name'
+    ? a.name.localeCompare(b.name)
+    : new Date(b.createdAt) - new Date(a.createdAt));
+
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
       {/* Header — title only, back is in FAB stack */}
@@ -341,11 +346,25 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
         </p>
       </header>
 
-      {/* Breadcrumb strip */}
-      <div className="px-4 pt-3 pb-0 flex items-center gap-1.5 text-xs text-[var(--text)] opacity-50">
-        <span>Libraries</span>
-        <span>›</span>
-        <span className="text-[var(--text-h)] opacity-80 font-medium">{library.name}</span>
+      {/* Breadcrumb + sort strip */}
+      <div className="px-4 pt-3 pb-0 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs text-[var(--text)] opacity-50">
+          <span>Libraries</span>
+          <span>›</span>
+          <span className="text-[var(--text-h)] opacity-80 font-medium">{library.name}</span>
+        </div>
+        {rooms.length > 1 && (
+          <div className="flex items-center gap-1">
+            {['date', 'name'].map((s) => (
+              <button key={s} onClick={() => setRoomSort(s)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                  roomSort === s ? 'bg-[var(--accent)] text-white' : 'bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text)] hover:opacity-70'
+                }`}>
+                {s === 'date' ? 'Date' : 'Name'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <main className="flex-1 px-4 py-4 pb-24">
@@ -370,7 +389,7 @@ export default function RoomsView({ library, onBack, onOpenRoom }) {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {rooms.map((room) => (
+            {sortedRooms.map((room) => (
               <RoomCard
                 key={room.id}
                 room={room}

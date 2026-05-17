@@ -33,23 +33,8 @@ async function compressImage(dataUrl, maxPx = 900, q = 0.75) {
   });
 }
 
-function RenameModal({ current, onClose, onRename }) {
-  const [name, setName] = useState(current);
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm modal-fade-in" />
-      <div className="relative w-full sm:max-w-sm bg-[var(--bg)] rounded-t-3xl sm:rounded-3xl z-10 modal-slide-up px-6 pt-5 pb-8" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-center mb-5 sm:hidden"><div className="w-10 h-1 bg-[var(--border)] rounded-full" /></div>
-        <h2 className="text-lg font-bold text-[var(--text-h)] mb-4">Rename library</h2>
-        <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && onRename(name.trim())}
-          maxLength={32} className="w-full px-4 py-3 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-[var(--accent)] transition-colors text-sm mb-4" />
-        <button onClick={() => name.trim() && onRename(name.trim())} disabled={!name.trim()} className="w-full py-3 rounded-2xl bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-30">Save</button>
-      </div>
-    </div>
-  );
-}
 
-function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename, onArchive }) {
+function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onEdit, onArchive }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -99,9 +84,9 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename, on
           >
             {!confirmDelete ? (
               <>
-                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(lib); }}
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(lib); }}
                   className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
-                  ✏️ Rename
+                  ✏️ Edit
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onArchive(lib); }}
                   className="w-full px-4 py-3 text-sm text-[var(--text-h)] text-left hover:bg-[var(--code-bg)] transition-colors border-b border-[var(--border)]">
@@ -146,6 +131,85 @@ function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onRename, on
         <p className="text-xs text-[var(--text)] opacity-50 pl-4">
           {roomCount} {roomCount === 1 ? 'room' : 'rooms'} · {noteCount} {noteCount === 1 ? 'note' : 'notes'}
         </p>
+      </div>
+    </div>
+  );
+}
+
+function EditLibraryModal({ lib, onClose, onEdit }) {
+  const [name, setName] = useState(lib.name);
+  const [icon, setIcon] = useState(lib.icon);
+  const [color, setColor] = useState(lib.accent);
+  const [coverImage, setCoverImage] = useState(lib.coverImage || null);
+  const [uploading, setUploading] = useState(false);
+  const imgRef = useRef(null);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    setUploading(true);
+    const fr = new FileReader();
+    fr.onload = async (ev) => { setCoverImage(await compressImage(ev.target.result)); setUploading(false); };
+    fr.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm modal-fade-in" />
+      <div className="relative w-full sm:max-w-md bg-[var(--bg)] rounded-t-3xl sm:rounded-3xl z-10 modal-slide-up overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-10 h-1 bg-[var(--border)] rounded-full" /></div>
+        <div className="px-6 pt-4 pb-8 max-h-[85vh] overflow-y-auto">
+          <h2 className="text-xl font-bold text-[var(--text-h)] mb-6">Edit Library</h2>
+          <div className="w-full h-20 rounded-2xl mb-6 flex items-center justify-center text-3xl overflow-hidden relative"
+            style={coverImage ? {} : { background: `linear-gradient(135deg, ${color}40, ${color}20)` }}>
+            {coverImage ? <img src={coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" /> : icon}
+          </div>
+          <div className="mb-5">
+            <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2 block">Cover Image <span className="normal-case font-normal opacity-40">(optional)</span></label>
+            {coverImage ? (
+              <div className="relative w-full h-20 rounded-xl overflow-hidden">
+                <img src={coverImage} alt="" className="w-full h-full object-cover" />
+                <button onClick={() => setCoverImage(null)} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors">✕</button>
+              </div>
+            ) : (
+              <button onClick={() => imgRef.current.click()} disabled={uploading} className="w-full py-3 rounded-xl bg-[var(--code-bg)] border border-dashed border-[var(--border)] text-sm text-[var(--text)] opacity-60 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 disabled:opacity-30">
+                {uploading ? '⏳ Compressing…' : '🖼 Upload cover image'}
+              </button>
+            )}
+            <input ref={imgRef} type="file" accept="image/*" hidden onChange={handleImageUpload} />
+          </div>
+          <div className="mb-5">
+            <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2 block">Name</label>
+            <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && name.trim() && onEdit({ name: name.trim(), icon, accent: color, coverImage })} maxLength={32}
+              className="w-full px-4 py-3 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text-h)] placeholder:text-[var(--text)] placeholder:opacity-40 outline-none focus:border-[var(--accent)] transition-colors text-sm" />
+          </div>
+          <div className="mb-5">
+            <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2 block">Icon</label>
+            <div className="flex flex-wrap gap-2">
+              {ICONS.map((ic) => (
+                <button key={ic} onClick={() => setIcon(ic)}
+                  className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all ${
+                    icon === ic ? 'scale-110 border-2 border-[var(--accent)] bg-[var(--accent-bg)]' : 'border-2 border-transparent bg-[var(--code-bg)]'
+                  }`}>{ic}</button>
+              ))}
+            </div>
+          </div>
+          <div className="mb-7">
+            <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2 block">Color</label>
+            <div className="flex flex-wrap gap-3">
+              {ACCENT_COLORS.map((c) => (
+                <button key={c} onClick={() => setColor(c)} className="w-8 h-8 rounded-full transition-transform"
+                  style={{ backgroundColor: c, transform: color === c ? 'scale(1.25)' : 'scale(1)', outline: color === c ? `3px solid ${c}` : '2px solid transparent', outlineOffset: '3px' }} />
+              ))}
+            </div>
+          </div>
+          <button onClick={() => name.trim() && onEdit({ name: name.trim(), icon, accent: color, coverImage })} disabled={!name.trim()}
+            className="w-full py-3.5 rounded-2xl bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 active:scale-95 transition-all">
+            Update Library
+          </button>
+          <button onClick={onClose} className="w-full mt-2 py-3 rounded-2xl bg-[var(--code-bg)] text-[var(--text)] text-sm font-medium hover:opacity-70 active:scale-95 transition-all">Cancel</button>
+        </div>
       </div>
     </div>
   );
@@ -313,7 +377,7 @@ function CreateLibraryModal({ onClose, onCreate }) {
 export default function AppContent({ onLock }) {
   const [libraries, setLibraries] = useState(() => getStore().libraries || []);
   const [showCreate, setShowCreate] = useState(false);
-  const [renamingLib, setRenamingLib] = useState(null);
+  const [editingLib, setEditingLib] = useState(null);
   const [view, setView] = useState('libraries');
   const [activeLibrary, setActiveLibrary] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
@@ -365,9 +429,9 @@ export default function AppContent({ onLock }) {
     setShowCreate(false);
   };
 
-  const handleRename = (id, name) => {
-    persistLibraries(libraries.map((l) => l.id === id ? { ...l, name } : l));
-    setRenamingLib(null);
+  const handleEditLibrary = (lib, { name, icon, accent, coverImage }) => {
+    persistLibraries(libraries.map((l) => l.id === lib.id ? { ...l, name, icon, accent, coverImage: coverImage || null } : l));
+    setEditingLib(null);
   };
 
   const handleDelete = (id) => {
@@ -540,7 +604,7 @@ export default function AppContent({ onLock }) {
                 roomCount={roomCount(lib.id)}
                 onDelete={handleDelete}
                 onOpen={() => { setActiveLibrary(lib); setView('rooms'); }}
-                onRename={setRenamingLib}
+                onEdit={setEditingLib}
                 onArchive={handleArchiveLibrary}
               />
             ))}
@@ -559,8 +623,8 @@ export default function AppContent({ onLock }) {
         </button>
       )}
 
-      {renamingLib && (
-        <RenameModal current={renamingLib.name} onClose={() => setRenamingLib(null)} onRename={(name) => handleRename(renamingLib.id, name)} />
+      {editingLib && (
+        <EditLibraryModal lib={editingLib} onClose={() => setEditingLib(null)} onEdit={(updates) => handleEditLibrary(editingLib, updates)} />
       )}
 
       {/* ── Create modal ── */}

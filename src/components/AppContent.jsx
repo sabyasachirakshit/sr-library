@@ -322,7 +322,10 @@ export default function AppContent({ onLock }) {
   const [libSearch, setLibSearch] = useState('');
 
   if (view === 'archives') {
-    return <ArchivesView onBack={() => setView('libraries')} />;
+    return <ArchivesView onBack={() => {
+      setLibraries(getStore().libraries || []);
+      setView('libraries');
+    }} />;
   }
   if (view === 'notes') {
     return (

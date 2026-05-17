@@ -420,13 +420,17 @@ function MoveNoteModal({ note, currentRoom, onClose, onMove }) {
 }
 
 /* ── Notes List View (default export) ────────────────────── */
-export default function NotesView({ room, library, onBack }) {
+export default function NotesView({ room, library, onBack, initialNoteId }) {
   const [notes, setNotes] = useState(() =>
     (getStore().notes || []).filter((n) => n.roomId === room.id)
       .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
   );
-  const [mode, setMode] = useState('list'); // list | read | edit
-  const [activeNote, setActiveNote] = useState(null);
+  const [mode, setMode] = useState(() => initialNoteId ? 'read' : 'list');
+  const [activeNote, setActiveNote] = useState(() =>
+    initialNoteId
+      ? ((getStore().notes || []).find((n) => n.id === initialNoteId) || null)
+      : null
+  );
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [movingNote, setMovingNote] = useState(null);
   const [search, setSearch] = useState('');

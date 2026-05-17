@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { getStore, updateStore, exportStore, importStore } from '../store/libraryStore';
 import RoomsView from './RoomsView';
 import NotesView from './NotesView';
@@ -33,6 +33,116 @@ async function compressImage(dataUrl, maxPx = 900, q = 0.75) {
   });
 }
 
+
+function GlobalSearchModal({ onClose, onOpenLibrary, onOpenRoom, onOpenNote }) {
+  const [query, setQuery] = useState('');
+
+  const results = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q) return [];
+    const store = getStore();
+    const libs = store.libraries || [];
+    const allRooms = store.rooms || [];
+    const allNotes = store.notes || [];
+    const out = [];
+    libs.forEach((lib) => {
+      if (lib.name.toLowerCase().includes(q))
+        out.push({ type: 'library', lib, key: lib.id });
+    });
+    allRooms.forEach((room) => {
+      if (!room.name.toLowerCase().includes(q)) return;
+      const lib = libs.find((l) => l.id === room.libraryId) || null;
+      if (!lib) return; // can't navigate without a library
+      out.push({ type: 'room', room, lib, key: room.id });
+    });
+    allNotes.forEach((note) => {
+      const raw = (note.content || '').replace(/\[image:[a-z0-9]+\]/gi, '');
+      const titleMatch = (note.title || '').toLowerCase().includes(q);
+      const contentMatch = raw.toLowerCase().includes(q);
+      if (!titleMatch && !contentMatch) return;
+      const room = allRooms.find((r) => r.id === note.roomId) || null;
+      // fall back: resolve libraryId through the room when note.libraryId is missing
+      const libId = note.libraryId || room?.libraryId;
+      const lib = libs.find((l) => l.id === libId) || null;
+      if (!room || !lib) return; // can't navigate without both
+      out.push({ type: 'note', note, room, lib, raw, contentMatch, key: note.id });
+    });
+    return out;
+  }, [query]);
+
+  const getSnippet = (text, q) => {
+    const idx = text.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) return text.slice(0, 80) + (text.length > 80 ? '…' : '');
+    const s = Math.max(0, idx - 20);
+    const e = Math.min(text.length, idx + q.length + 60);
+    return (s > 0 ? '…' : '') + text.slice(s, e) + (e < text.length ? '…' : '');
+  };
+
+  const TYPE_COLOR = { library: '#9333ea', room: '#2563eb', note: '#16a34a' };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[var(--bg)] flex flex-col">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg)]/90 backdrop-blur-md">
+        <span className="text-lg opacity-40">🔍</span>
+        <input autoFocus type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search libraries, rooms, notes…"
+          className="flex-1 bg-transparent outline-none text-[var(--text-h)] text-[15px] placeholder:text-[var(--text)] placeholder:opacity-30" />
+        {query && <button onClick={() => setQuery('')} className="text-xs text-[var(--text)] opacity-40 hover:opacity-80">✕</button>}
+        <button onClick={onClose} className="text-sm px-3 py-1.5 rounded-xl bg-[var(--code-bg)] border border-[var(--border)] text-[var(--text)] hover:opacity-70 transition-opacity">Done</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        {!query.trim() ? (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center gap-3">
+            <span className="text-5xl opacity-20">🔍</span>
+            <p className="text-sm text-[var(--text)] opacity-40">Search across all libraries, rooms and notes</p>
+          </div>
+        ) : results.length === 0 ? (
+          <p className="text-center text-sm text-[var(--text)] opacity-40 mt-16">No results for “{query}”</p>
+        ) : (
+          <>
+            <p className="text-xs text-[var(--text)] opacity-40 mb-3">{results.length} result{results.length !== 1 ? 's' : ''}</p>
+            <div className="flex flex-col gap-2">
+              {results.map((r) => (
+                <button key={r.key}
+                  onClick={() => {
+                    if (r.type === 'library') onOpenLibrary(r.lib);
+                    else if (r.type === 'room') onOpenRoom(r.room, r.lib);
+                    else onOpenNote(r.note, r.room, r.lib);
+                  }}
+                  className="w-full text-left rounded-2xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden hover:bg-[var(--code-bg)] transition-colors active:scale-[0.98]">
+                  <div className="flex items-stretch">
+                    <div className="w-1 flex-shrink-0" style={{ backgroundColor: TYPE_COLOR[r.type] }} />
+                    <div className="flex-1 min-w-0 px-4 py-3">
+                      <p className="text-[10px] text-[var(--text)] opacity-40 truncate mb-1">
+                        {r.type === 'library' && 'Library'}
+                        {r.type === 'room' && `${r.lib.icon} ${r.lib.name}  ›  Room`}
+                        {r.type === 'note' && `${r.lib.icon} ${r.lib.name}  ›  ${r.room.icon} ${r.room.name}  ›  Note`}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base leading-none">
+                          {r.type === 'library' ? r.lib.icon : r.type === 'room' ? r.room.icon : '📝'}
+                        </span>
+                        <span className="font-semibold text-sm text-[var(--text-h)] truncate">
+                          {r.type === 'library' ? r.lib.name : r.type === 'room' ? r.room.name : (r.note.title || 'Untitled')}
+                        </span>
+                      </div>
+                      {r.type === 'note' && r.contentMatch && (
+                        <p className="text-xs text-[var(--text)] opacity-45 mt-1 line-clamp-2 leading-relaxed">
+                          {getSnippet(r.raw, query)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center px-3 text-[var(--text)] opacity-25 text-sm flex-shrink-0">›</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function LibraryCard({ lib, noteCount, roomCount, onDelete, onOpen, onEdit, onArchive }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -378,6 +488,8 @@ export default function AppContent({ onLock }) {
   const [libraries, setLibraries] = useState(() => getStore().libraries || []);
   const [showCreate, setShowCreate] = useState(false);
   const [editingLib, setEditingLib] = useState(null);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [initialNoteId, setInitialNoteId] = useState(null);
   const [view, setView] = useState('libraries');
   const [activeLibrary, setActiveLibrary] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
@@ -397,7 +509,8 @@ export default function AppContent({ onLock }) {
       <NotesView
         room={activeRoom}
         library={activeLibrary}
-        onBack={() => setView('rooms')}
+        onBack={() => { setView('rooms'); setInitialNoteId(null); }}
+        initialNoteId={initialNoteId}
       />
     );
   }
@@ -508,6 +621,13 @@ export default function AppContent({ onLock }) {
               {importMsg}
             </span>
           )}
+          <button
+            onClick={() => setShowGlobalSearch(true)}
+            title="Global search"
+            className="w-9 h-9 rounded-xl bg-[var(--code-bg)] flex items-center justify-center text-base hover:opacity-70 transition-opacity"
+          >
+            🔍
+          </button>
           <button
             onClick={() => setView('archives')}
             title="Archives"
@@ -625,6 +745,14 @@ export default function AppContent({ onLock }) {
 
       {editingLib && (
         <EditLibraryModal lib={editingLib} onClose={() => setEditingLib(null)} onEdit={(updates) => handleEditLibrary(editingLib, updates)} />
+      )}
+      {showGlobalSearch && (
+        <GlobalSearchModal
+          onClose={() => setShowGlobalSearch(false)}
+          onOpenLibrary={(lib) => { setActiveLibrary(lib); setView('rooms'); setShowGlobalSearch(false); }}
+          onOpenRoom={(room, lib) => { setActiveLibrary(lib); setActiveRoom(room); setView('notes'); setShowGlobalSearch(false); }}
+          onOpenNote={(note, room, lib) => { setActiveLibrary(lib); setActiveRoom(room); setInitialNoteId(note.id); setView('notes'); setShowGlobalSearch(false); }}
+        />
       )}
 
       {/* ── Create modal ── */}

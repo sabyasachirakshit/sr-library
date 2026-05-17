@@ -89,9 +89,35 @@ function ViewHeader({ library, room, right, extra }) {
 }
 
 /* ── Inline image + text renderer ─────────────────────────── */
-function ContentWithImages({ content, images, search }) {
+function ContentWithImages({ content, images, search, onToggle }) {
   const imgMap = Object.fromEntries((images || []).map((im) => [im.id, im]));
   const parts = content.split(/(\[image:[a-z0-9]+\])/gi);
+
+  const renderTextPart = (text, baseKey) =>
+    text.split('\n').map((line, li) => {
+      const cm = line.match(/^- \[([ x])\] (.*)$/);
+      if (cm) {
+        const checked = cm[1] === 'x';
+        return (
+          <div key={`${baseKey}-${li}`} className="flex items-center gap-2.5 my-1.5">
+            <button onClick={() => onToggle && onToggle(line, checked)}
+              className={`w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center border-2 transition-all active:scale-90 ${
+                checked ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border)] bg-[var(--code-bg)]'
+              }`}>
+              {checked && <span className="text-white text-[10px] font-bold leading-none">✓</span>}
+            </button>
+            <span className={`text-[15px] leading-[1.9] ${ checked ? 'line-through opacity-40' : '' }`}>
+              {search ? <Hl text={cm[2]} q={search} /> : cm[2]}
+            </span>
+          </div>
+        );
+      }
+      if (!line && li === text.split('\n').length - 1) return null;
+      return line
+        ? <p key={`${baseKey}-${li}`} className="whitespace-pre-wrap">{search ? <Hl text={line} q={search} /> : line}</p>
+        : <br key={`${baseKey}-${li}`} />;
+    });
+
   return (
     <div className="text-[15px] text-[var(--text)] leading-[1.9]">
       {parts.map((part, i) => {
@@ -102,9 +128,7 @@ function ContentWithImages({ content, images, search }) {
             ? <img key={i} src={im.dataUrl} alt="" className="w-full rounded-2xl my-4 border border-[var(--border)] block" />
             : null;
         }
-        return part
-          ? <span key={i} className="whitespace-pre-wrap">{search ? <Hl text={part} q={search} /> : part}</span>
-          : null;
+        return part ? <span key={i}>{renderTextPart(part, i)}</span> : null;
       })}
     </div>
   );
@@ -135,6 +159,20 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
     onBack();
   };
   useEffect(() => () => clearTimeout(debRef.current), []);
+
+  const insertChecklist = () => {
+    const ta = taRef.current;
+    const pos = ta ? ta.selectionStart : content.length;
+    const before = content.slice(0, pos);
+    const needsNewline = before.length > 0 && !before.endsWith('\n');
+    const marker = (needsNewline ? '\n' : '') + '- [ ] ';
+    const newC = before + marker + content.slice(pos);
+    setContent(newC);
+    save(title, newC, images);
+    requestAnimationFrame(() => {
+      if (ta) { ta.selectionStart = ta.selectionEnd = pos + marker.length; ta.focus(); }
+    });
+  };
 
   const handleImage = async (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -192,8 +230,12 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
         </div>
         <textarea ref={taRef} value={content}
           onChange={(e) => { setContent(e.target.value); save(title, e.target.value, images); }}
-          placeholder="Start writing… tap 🖼 in the header to insert an image at cursor position"
+          placeholder="Start writing…"
           className="flex-1 min-h-[55vh] w-full text-[15px] text-[var(--text)] bg-transparent outline-none border-none resize-none placeholder:text-[var(--text)] placeholder:opacity-20 leading-[1.8]" />
+        <button onClick={insertChecklist}
+          className="mt-3 self-start px-4 py-2 rounded-xl border border-dashed border-[var(--border)] text-xs text-[var(--text)] opacity-50 hover:opacity-90 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all active:scale-95">
+          + Create new checkbox
+        </button>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-10 h-10 px-5 bg-[var(--bg)]/90 backdrop-blur-sm border-t border-[var(--border)] flex items-center justify-center pointer-events-none">
@@ -209,14 +251,25 @@ function NoteEditor({ note, room, library, onBack, onSave }) {
 }
 
 /* ── Note Reader ──────────────────────────────────────────── */
-function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit }) {
+function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit, onSave }) {
   const [search, setSearch] = useState(outerSearch || '');
   const [copied, setCopied] = useState(false);
-  const rawText = note.content.replace(/\[image:[a-z0-9]+\]/gi, '');
+  const [localContent, setLocalContent] = useState(note.content);
+  const rawText = localContent.replace(/\[image:[a-z0-9]+\]/gi, '');
   const imgCount = (note.images || []).length;
   const matchCount = search.trim()
     ? ((note.title + '\n' + rawText).match(new RegExp(escRe(search), 'gi')) || []).length
     : 0;
+
+  const handleToggle = (lineText, wasChecked) => {
+    const toggled = wasChecked
+      ? lineText.replace(/^- \[x\] /, '- [ ] ')
+      : lineText.replace(/^- \[ \] /, '- [x] ');
+    const escaped = lineText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const newContent = localContent.replace(new RegExp(`^${escaped}$`, 'm'), toggled);
+    setLocalContent(newContent);
+    onSave && onSave(note.id, note.title, newContent, note.images);
+  };
 
   const handleCopy = () => {
     const text = [note.title, rawText].filter(Boolean).join('\n\n');
@@ -269,8 +322,8 @@ function NoteReader({ note, room, library, search: outerSearch, onBack, onEdit }
           <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
 
-        {note.content
-          ? <ContentWithImages content={note.content} images={note.images} search={search} />
+        {localContent
+          ? <ContentWithImages content={localContent} images={note.images} search={search} onToggle={handleToggle} />
           : <p className="text-sm text-[var(--text)] opacity-30 italic">This note is empty.</p>}
       </article>
 
@@ -408,7 +461,7 @@ export default function NotesView({ room, library, onBack }) {
     return <NoteEditor note={activeNote} room={room} library={library} onBack={() => { setMode(notes.find(n => n.id === activeNote.id)?.content !== undefined ? 'read' : 'list'); }} onSave={handleSave} />;
 
   if (mode === 'read' && activeNote)
-    return <NoteReader note={notes.find(n => n.id === activeNote.id) || activeNote} room={room} library={library} search={search} onBack={() => setMode('list')} onEdit={() => openEdit(activeNote)} />;
+    return <NoteReader note={notes.find(n => n.id === activeNote.id) || activeNote} room={room} library={library} search={search} onBack={() => setMode('list')} onEdit={() => openEdit(activeNote)} onSave={handleSave} />;
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
